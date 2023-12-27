@@ -2,4 +2,4 @@ module github.com/nargaruga/graphxplorer
 
 go 1.21.5
 
-require gonum.org/v1/gonum v0.14.0 // indirect
+require github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
