@@ -30,7 +30,11 @@ func main() {
 	graph := *parseGraph(contents)
 	check(err)
 
-	bfs(graph)
+	explored_nodes_list := bfs(graph)
+	fmt.Println("Explored", len(explored_nodes_list), "nodes:")
+	for _, node := range explored_nodes_list {
+		fmt.Println(node)
+	}
 }
 
 // Parse the provided bytes into a DOT graph and return it
