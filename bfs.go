@@ -5,7 +5,7 @@ import (
 )
 
 // Perform a BFS on the provided graph, printing every explored node
-func bfs(graph gographviz.Graph) []string {
+func bfs(graph gographviz.Graph, result_ch chan string, done_ch chan bool) {
 	// TODO: check null pointer?
 	starting_node := *graph.Nodes.Nodes[0]
 	explored := make(map[string]bool)
@@ -27,14 +27,11 @@ func bfs(graph gographviz.Graph) []string {
 
 		// Mark this node as explored to avoid revisiting it
 		explored[node.Name] = true
+
+		result_ch <- node.Name
 	}
 
-	explored_nodes_list := make([]string, 0, len(explored))
-	for k := range explored {
-		explored_nodes_list = append(explored_nodes_list, k)
-	}
-
-	return explored_nodes_list
+	done_ch <- true
 }
 
 // Return an array containing all the neighbours of the provided node

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/awalterschulze/gographviz"
 )
@@ -30,11 +31,21 @@ func main() {
 	graph := *parseGraph(contents)
 	check(err)
 
-	explored_nodes_list := bfs(graph)
-	fmt.Println("Explored", len(explored_nodes_list), "nodes:")
-	for _, node := range explored_nodes_list {
-		fmt.Println(node)
-	}
+	result_ch := make(chan string)
+	done_ch := make(chan bool)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		bfs(graph, result_ch, done_ch)
+	}()
+	go func() {
+		defer wg.Done()
+		gather_results(result_ch, done_ch)
+	}()
+	wg.Wait()
+	fmt.Println("Finished successfully.")
 }
 
 // Parse the provided bytes into a DOT graph and return it
@@ -46,4 +57,22 @@ func parseGraph(data []byte) *gographviz.Graph {
 	check(err)
 
 	return graph
+}
+
+// Gather results from result_ch and print them until a message arrives on done_ch
+func gather_results(result_ch chan string, done_ch chan bool) {
+	var explored_nodes_list []string
+
+	for {
+		select {
+		case res := <-result_ch:
+			explored_nodes_list = append(explored_nodes_list, res)
+		case <-done_ch:
+			fmt.Println("Explored", len(explored_nodes_list), "nodes:")
+			for _, node := range explored_nodes_list {
+				fmt.Println(node)
+			}
+			return
+		}
+	}
 }
