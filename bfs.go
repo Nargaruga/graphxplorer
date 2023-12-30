@@ -1,11 +1,13 @@
 package main
 
 import (
+	"sync"
+
 	"github.com/awalterschulze/gographviz"
 )
 
-// Perform a BFS on the provided graph, printing every explored node
-func bfs(graph gographviz.Graph, result_ch chan string, done_ch chan bool) {
+// Perform a BFS on the provided graph, sending every new node on the 'out_ch' channel
+func bfs(graph gographviz.Graph, out_ch chan string, done_ch chan bool) {
 	// TODO: check null pointer?
 	starting_node := *graph.Nodes.Nodes[0]
 	explored := make(map[string]bool)
@@ -17,18 +19,71 @@ func bfs(graph gographviz.Graph, result_ch chan string, done_ch chan bool) {
 		node := frontier[0]
 		frontier = frontier[1:]
 
-		// Skip already explored nodes
+		// Skip node if already explored
 		if explored[node.Name] {
 			continue
 		}
 
-		// Update the frontier with this node's neighbours
-		frontier = append(frontier, get_neighbours(graph, node)...)
-
 		// Mark this node as explored to avoid revisiting it
 		explored[node.Name] = true
 
-		result_ch <- node.Name
+		// Update the frontier with this node's neighbours
+		neighbours := get_neighbours(graph, node)
+		frontier = append(frontier, neighbours...)
+
+		out_ch <- node.Name
+	}
+
+	done_ch <- true
+}
+
+// Perform a parallelized BFS on the provided graph, sending every new node on the 'out_ch' channel
+func parallel_bfs(graph gographviz.Graph, out_ch chan string, done_ch chan bool) {
+	// TODO: check null pointer?
+	starting_node := *graph.Nodes.Nodes[0]
+	explored := make(map[string]bool)
+	var frontier []gographviz.Node
+	frontier = append(frontier, starting_node)
+
+	var frontier_mx sync.Mutex
+	var explored_mx sync.Mutex
+
+	var wg sync.WaitGroup
+	for len(frontier) != 0 {
+		frontier_size := len(frontier)
+		wg.Add(frontier_size)
+		for i := 0; i < frontier_size; i++ {
+			go func() {
+				defer wg.Done()
+
+				// Pop the head of the frontier
+				frontier_mx.Lock()
+				node := frontier[0]
+				frontier = frontier[1:]
+				frontier_mx.Unlock()
+
+				// Skip node if already explored
+				explored_mx.Lock()
+				already_visited := explored[node.Name]
+				if already_visited {
+					explored_mx.Unlock()
+					return
+				}
+
+				// Mark this node as explored to avoid revisiting it
+				explored[node.Name] = true
+				explored_mx.Unlock()
+
+				// Update the frontier with this node's neighbours
+				neighbours := get_neighbours(graph, node)
+				frontier_mx.Lock()
+				frontier = append(frontier, neighbours...)
+				frontier_mx.Unlock()
+
+				out_ch <- node.Name
+			}()
+		}
+		wg.Wait()
 	}
 
 	done_ch <- true

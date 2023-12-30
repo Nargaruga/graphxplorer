@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/awalterschulze/gographviz"
 )
@@ -31,21 +32,10 @@ func main() {
 	graph := *parseGraph(contents)
 	check(err)
 
-	result_ch := make(chan string)
-	done_ch := make(chan bool)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		bfs(graph, result_ch, done_ch)
-	}()
-	go func() {
-		defer wg.Done()
-		gather_results(result_ch, done_ch)
-	}()
-	wg.Wait()
-	fmt.Println("Finished successfully.")
+	fmt.Println("--- Sequential ---")
+	explore_graph(graph, true)
+	fmt.Println("--- Parallel ---")
+	explore_graph(graph, false)
 }
 
 // Parse the provided bytes into a DOT graph and return it
@@ -59,6 +49,31 @@ func parseGraph(data []byte) *gographviz.Graph {
 	return graph
 }
 
+// Explore the graph with either a sequential or parallel search
+func explore_graph(graph gographviz.Graph, seq bool) {
+	result_ch := make(chan string)
+	done_ch := make(chan bool)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	start := time.Now()
+	go func() {
+		defer wg.Done()
+		if seq {
+			bfs(graph, result_ch, done_ch)
+		} else {
+			parallel_bfs(graph, result_ch, done_ch)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		gather_results(result_ch, done_ch)
+	}()
+	wg.Wait()
+	end := time.Now()
+	fmt.Println("Finished successfully in ", end.Sub(start).Microseconds(), "us.")
+}
+
 // Gather results from result_ch and print them until a message arrives on done_ch
 func gather_results(result_ch chan string, done_ch chan bool) {
 	var explored_nodes_list []string
@@ -68,10 +83,11 @@ func gather_results(result_ch chan string, done_ch chan bool) {
 		case res := <-result_ch:
 			explored_nodes_list = append(explored_nodes_list, res)
 		case <-done_ch:
-			fmt.Println("Explored", len(explored_nodes_list), "nodes:")
-			for _, node := range explored_nodes_list {
-				fmt.Println(node)
-			}
+			// fmt.Println("Nodes:")
+			// for _, node := range explored_nodes_list {
+			// 	fmt.Println(node)
+			// }
+			fmt.Println("Explored", len(explored_nodes_list), "nodes.")
 			return
 		}
 	}
