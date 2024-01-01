@@ -37,7 +37,7 @@ func bfs(graph gographviz.Graph, out_ch chan string, done_ch chan bool) {
 	done_ch <- true
 }
 
-// Perform a parallelized BFS on the provided graph, sending every new node on the 'out_ch' channel
+// TODO: desc
 func parallel_bfs(graph gographviz.Graph, out_ch chan string, done_ch chan bool) {
 	// TODO: check null pointer?
 	starting_node := *graph.Nodes.Nodes[0]
@@ -45,44 +45,39 @@ func parallel_bfs(graph gographviz.Graph, out_ch chan string, done_ch chan bool)
 	var frontier []gographviz.Node
 	frontier = append(frontier, starting_node)
 
-	var frontier_mx sync.Mutex
-	var explored_mx sync.Mutex
+	req_frontier_ch := make(chan bool)
+	frontier_ch := make(chan []gographviz.Node)
+	append_ch := make(chan []gographviz.Node)
+	cleanup_frontier_ch := make(chan bool)
+
+	go maintain_frontier(frontier, req_frontier_ch, frontier_ch, append_ch, cleanup_frontier_ch)
 
 	var wg sync.WaitGroup
-	for len(frontier) != 0 {
-		frontier_size := len(frontier)
-		wg.Add(frontier_size)
-		for i := 0; i < frontier_size; i++ {
-			go func() {
-				defer wg.Done()
 
-				// Pop the head of the frontier
-				frontier_mx.Lock()
-				node := frontier[0]
-				frontier = frontier[1:]
-				frontier_mx.Unlock()
+	for {
+		// Request the current frontier
+		req_frontier_ch <- true
+		current_frontier := <-frontier_ch
 
-				// Skip node if already explored
-				explored_mx.Lock()
-				already_visited := explored[node.Name]
-				if already_visited {
-					explored_mx.Unlock()
-					return
-				}
-
-				// Mark this node as explored to avoid revisiting it
-				explored[node.Name] = true
-				explored_mx.Unlock()
-
-				// Update the frontier with this node's neighbours
-				neighbours := get_neighbours(graph, node)
-				frontier_mx.Lock()
-				frontier = append(frontier, neighbours...)
-				frontier_mx.Unlock()
-
-				out_ch <- node.Name
-			}()
+		if len(current_frontier) == 0 {
+			break
 		}
+
+		for _, node := range current_frontier {
+			if explored[node.Name] {
+				continue
+			}
+			explored[node.Name] = true
+
+			// Each node is processed in a separate goroutine
+			wg.Add(1)
+			go func(to_process gographviz.Node) {
+				defer wg.Done()
+				append_ch <- get_neighbours(graph, to_process)
+				out_ch <- to_process.Name
+			}(node)
+		}
+
 		wg.Wait()
 	}
 
@@ -102,4 +97,19 @@ func get_neighbours(graph gographviz.Graph, node gographviz.Node) []gographviz.N
 	}
 
 	return neighbours
+}
+
+// Manage access to the frontier, appending received nodes and sending the current state of the frontier when requested
+func maintain_frontier(frontier []gographviz.Node, req_frontier_ch chan bool, frontier_ch chan []gographviz.Node, append_ch chan []gographviz.Node, done_ch chan bool) {
+	for {
+		select {
+		case <-req_frontier_ch:
+			frontier_ch <- frontier
+			frontier = nil
+		case nodes := <-append_ch:
+			frontier = append(frontier, nodes...)
+		case <-done_ch:
+			return
+		}
+	}
 }
