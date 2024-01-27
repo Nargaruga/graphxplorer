@@ -11,6 +11,7 @@ import (
 	"github.com/awalterschulze/gographviz"
 )
 
+// Function implementing a graph exploration strategy
 type explorationStrategy func(gographviz.Graph, chan NodeData, chan bool) error
 
 func main() {
@@ -61,7 +62,7 @@ func deserializeGraph(path string) (*gographviz.Graph, error) {
 	return graph, nil
 }
 
-// Explore the graph with the provided strategy
+// Explore the graph with the requested strategy
 func explore_graph(graph gographviz.Graph, strategy explorationStrategy) {
 	// Channel for communicating data about the explored nodes
 	node_data_ch := make(chan NodeData)

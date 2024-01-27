@@ -39,6 +39,7 @@ func BFS(graph gographviz.Graph, out_ch chan NodeData, done_ch chan bool) error 
 		node := frontier[0]
 		frontier = frontier[1:]
 
+		// Skip already explored nodes
 		if explored[node.Name] {
 			continue
 		}
@@ -79,30 +80,30 @@ func ParallelBFS(graph gographviz.Graph, out_ch chan NodeData, done_ch chan bool
 	// Keeps track of already-explored nodes
 	explored := make(map[string]bool)
 
-	// Channel to request the current frontier
+	// Channel to request the extraction of the current frontier
 	req_frontier_ch := make(chan bool)
 	// Channel to receive the current frontier
-	frontier_ch := make(chan []gographviz.Node)
+	get_frontier_ch := make(chan []gographviz.Node)
 	// Channel to append nodes to the frontier
 	append_ch := make(chan []gographviz.Node)
 
 	// Channel to request the distance of a node
 	req_distance_ch := make(chan string)
 	// Channel to receive the distance of a node
-	distance_ch := make(chan int)
+	get_distance_ch := make(chan int)
 	// Channel to update the distance of a node
 	update_distance_ch := make(chan NodeData)
 
-	// Access to the frontier and the distance data are handled by dedicated goroutines
-	go maintainFrontier(starting_node, req_frontier_ch, frontier_ch, append_ch, done_ch)
-	go maintainDistances(starting_node, req_distance_ch, distance_ch, update_distance_ch, done_ch)
+	// Access to the frontier and the distance data is regulated by dedicated goroutines
+	go maintainFrontier(starting_node, req_frontier_ch, get_frontier_ch, append_ch, done_ch)
+	go maintainDistances(starting_node, req_distance_ch, get_distance_ch, update_distance_ch, done_ch)
 
 	var wg sync.WaitGroup
 
 	for {
-		// Request the current frontier
+		// Extract the current frontier
 		req_frontier_ch <- true
-		current_frontier := <-frontier_ch
+		current_frontier := <-get_frontier_ch
 
 		// No more nodes in the frontier: we are done
 		if len(current_frontier) == 0 {
@@ -123,11 +124,11 @@ func ParallelBFS(graph gographviz.Graph, out_ch chan NodeData, done_ch chan bool
 				var neighbours_to_update []gographviz.Node
 
 				req_distance_ch <- to_process.Name
-				current_node_dist := <-distance_ch
+				current_node_dist := <-get_distance_ch
 
 				for _, neighbour := range neighbours {
 					req_distance_ch <- neighbour.Name
-					old_dist := <-distance_ch
+					old_dist := <-get_distance_ch
 					new_dist := current_node_dist + 1
 
 					// We only update the distance if it's shorter than the one currently recorder
@@ -167,7 +168,7 @@ func getNeighbours(graph gographviz.Graph, node gographviz.Node) []gographviz.No
 }
 
 // Manage access to the frontier, appending received nodes and sending the current state of the frontier when requested
-func maintainFrontier(starting_node gographviz.Node, req_frontier_ch chan bool, frontier_ch chan []gographviz.Node, append_ch chan []gographviz.Node, done_ch chan bool) {
+func maintainFrontier(starting_node gographviz.Node, req_frontier_ch chan bool, get_frontier_ch chan []gographviz.Node, append_ch chan []gographviz.Node, done_ch chan bool) {
 	// The current node frontier
 	var frontier []gographviz.Node
 	frontier = append(frontier, starting_node)
@@ -176,7 +177,7 @@ func maintainFrontier(starting_node gographviz.Node, req_frontier_ch chan bool, 
 		select {
 		case <-req_frontier_ch:
 			// Send the frontier, as requested
-			frontier_ch <- frontier
+			get_frontier_ch <- frontier
 			frontier = nil
 		case nodes := <-append_ch:
 			// Append the received nodes to the frontier
@@ -187,7 +188,7 @@ func maintainFrontier(starting_node gographviz.Node, req_frontier_ch chan bool, 
 	}
 }
 
-func maintainDistances(starting_node gographviz.Node, req_distance_ch chan string, distance_ch chan int, update_distance_ch chan NodeData, done_ch chan bool) {
+func maintainDistances(starting_node gographviz.Node, req_distance_ch chan string, get_distance_ch chan int, update_distance_ch chan NodeData, done_ch chan bool) {
 	// Maps each node to its distance from the starting node
 	distances := make(map[string]int)
 	distances[starting_node.Name] = 0
@@ -201,7 +202,7 @@ func maintainDistances(starting_node gographviz.Node, req_distance_ch chan strin
 				// This is the first time seeing the node, so we set its distance to the maximum
 				dist = math.MaxInt32
 			}
-			distance_ch <- dist
+			get_distance_ch <- dist
 		case node_data := <-update_distance_ch:
 			// Update the distance with the provided data
 			distances[node_data.Name] = node_data.Dist
