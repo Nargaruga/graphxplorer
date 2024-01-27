@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"math"
 	"sync"
 
@@ -17,13 +16,7 @@ type NodeData struct {
 // Perform a BFS on the provided graph, sending data about every new node on the
 // 'out_ch' channel and communicating the end of the search through the
 // 'done_ch' channel
-func BFS(graph gographviz.Graph, out_ch chan NodeData, done_ch chan bool) error {
-	if graph.Nodes == nil || len(graph.Nodes.Nodes) == 0 || graph.Nodes.Nodes[0] == nil {
-		return errors.New("Missing a starting node for the search.")
-	}
-
-	starting_node := *graph.Nodes.Nodes[0]
-
+func BFS(graph gographviz.Graph, starting_node gographviz.Node, out_ch chan NodeData, done_ch chan bool) error {
 	// Keeps track of already-explored nodes
 	explored := make(map[string]bool)
 	// Maps each node to its distance from the starting node
@@ -70,13 +63,7 @@ func BFS(graph gographviz.Graph, out_ch chan NodeData, done_ch chan bool) error 
 // Perform a BFS on the provided graph, sending data about every new node on the
 // 'out_ch' channel and communicating the end of the search through the
 // 'done_ch' channel
-func ParallelBFS(graph gographviz.Graph, out_ch chan NodeData, done_ch chan bool) error {
-	if graph.Nodes == nil || len(graph.Nodes.Nodes) == 0 || graph.Nodes.Nodes[0] == nil {
-		return errors.New("Missing a starting node for the search.")
-	}
-
-	starting_node := *graph.Nodes.Nodes[0]
-
+func ParallelBFS(graph gographviz.Graph, starting_node gographviz.Node, out_ch chan NodeData, done_ch chan bool) error {
 	// Keeps track of already-explored nodes
 	explored := make(map[string]bool)
 
