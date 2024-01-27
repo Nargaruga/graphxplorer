@@ -22,11 +22,15 @@ go build
 
 The program can be started as 
 ```
-./graphxplorer [-verbose] <path>
+./graphxplorer [-verbose] <path> <starting_node>
 ```
-where `path` is the path to a `.gv` file. The `example_inputs` containes a couple of example files that can be used to test the program.
+where
+- `path` is the path to a `.gv` file;
+- `starting_node` is the name of the starting node for the search.
 
 The `verbose` flag can be used to obtain more details about the search.
+
+The `example_inputs` contains a couple of example files that can be used to test the program
 
 ## Communication Graph
 #TODO
