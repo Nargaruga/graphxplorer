@@ -121,7 +121,7 @@ func gather_results(node_data_ch chan NodeData, done_ch chan bool, verbose bool)
 				// Sort nodes by their distance from the starting node
 				var sorted []NodeData
 				for name, dist := range node_distances {
-					sorted = append(sorted, NodeData{name, dist})
+					sorted = append(sorted, NodeData{Name: name, Dist: dist})
 				}
 				sort.Slice(sorted, func(i, j int) bool {
 					return sorted[i].Dist < sorted[j].Dist
