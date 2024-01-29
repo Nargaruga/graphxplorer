@@ -146,10 +146,6 @@ func getNeighbours(graph gographviz.Graph, node gographviz.Node) []gographviz.No
 	for dst := range graph.Edges.SrcToDsts[node.Name] {
 		neighbours = append(neighbours, *graph.Nodes.Lookup[dst])
 	}
-	// All nodes from which we can immediatey reach this node
-	for src := range graph.Edges.DstToSrcs[node.Name] {
-		neighbours = append(neighbours, *graph.Nodes.Lookup[src])
-	}
 
 	return neighbours
 }
