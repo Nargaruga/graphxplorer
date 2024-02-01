@@ -19,11 +19,11 @@ go build
 
 The program can be started as 
 ```
-./graphxplorer [-verbose] <path> <starting_node>
+./graphxplorer [-verbose] <path> <starting_node_1> ... <starting_node_n>
 ```
 where
 - `path` is the path to a `.gv` file;
-- `starting_node` is the name of the starting node for the search.
+- `<starting_node_1> ... <starting_node_n>` is the name of the nodes that make up the starting frontier.
 
 The `verbose` flag can be used to obtain more details about the search.
 

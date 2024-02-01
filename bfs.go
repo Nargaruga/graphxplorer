@@ -16,16 +16,18 @@ type NodeData struct {
 // Perform a BFS on the provided graph, sending data about every new node on the
 // 'out_ch' channel and communicating the end of the search through the
 // 'done_ch' channel
-func BFS(graph gographviz.Graph, starting_node gographviz.Node, out_ch chan NodeData, done_ch chan bool) error {
+func BFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan NodeData, done_ch chan bool) error {
 	// Keeps track of already-explored nodes
 	explored := make(map[string]bool)
 	// Maps each node to its distance from the starting node
 	distances := make(map[string]int)
 	// The current node frontier
 	var frontier []gographviz.Node
-	frontier = append(frontier, starting_node)
+	frontier = append(frontier, starting_nodes...)
 
-	distances[starting_node.Name] = 0
+	for _, node := range starting_nodes {
+		distances[node.Name] = 0
+	}
 
 	for len(frontier) != 0 {
 		// Pop the head of the frontier
@@ -63,7 +65,7 @@ func BFS(graph gographviz.Graph, starting_node gographviz.Node, out_ch chan Node
 // Perform a BFS on the provided graph, sending data about every new node on the
 // 'out_ch' channel and communicating the end of the search through the
 // 'done_ch' channel
-func ParallelBFS(graph gographviz.Graph, starting_node gographviz.Node, out_ch chan NodeData, done_ch chan bool) error {
+func ParallelBFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan NodeData, done_ch chan bool) error {
 	// Keeps track of already-explored nodes
 	explored := make(map[string]bool)
 
@@ -82,8 +84,8 @@ func ParallelBFS(graph gographviz.Graph, starting_node gographviz.Node, out_ch c
 	update_distance_ch := make(chan NodeData)
 
 	// Access to the frontier and the distance data is regulated by dedicated goroutines
-	go maintainFrontier(starting_node, req_frontier_ch, get_frontier_ch, append_ch, done_ch)
-	go maintainDistances(starting_node, req_distance_ch, get_distance_ch, update_distance_ch, done_ch)
+	go maintainFrontier(starting_nodes, req_frontier_ch, get_frontier_ch, append_ch, done_ch)
+	go maintainDistances(starting_nodes, req_distance_ch, get_distance_ch, update_distance_ch, done_ch)
 
 	var wg sync.WaitGroup
 
@@ -151,10 +153,10 @@ func getNeighbours(graph gographviz.Graph, node gographviz.Node) []gographviz.No
 }
 
 // Manage access to the frontier, appending received nodes and sending the current state of the frontier when requested
-func maintainFrontier(starting_node gographviz.Node, req_frontier_ch chan bool, get_frontier_ch chan []gographviz.Node, append_ch chan []gographviz.Node, done_ch chan bool) {
+func maintainFrontier(starting_nodes []gographviz.Node, req_frontier_ch chan bool, get_frontier_ch chan []gographviz.Node, append_ch chan []gographviz.Node, done_ch chan bool) {
 	// The current node frontier
 	var frontier []gographviz.Node
-	frontier = append(frontier, starting_node)
+	frontier = append(frontier, starting_nodes...)
 
 	for {
 		select {
@@ -171,10 +173,14 @@ func maintainFrontier(starting_node gographviz.Node, req_frontier_ch chan bool, 
 	}
 }
 
-func maintainDistances(starting_node gographviz.Node, req_distance_ch chan string, get_distance_ch chan int, update_distance_ch chan NodeData, done_ch chan bool) {
+// Manage access to the recorded node distances, handling queries and updates
+func maintainDistances(starting_nodes []gographviz.Node, req_distance_ch chan string, get_distance_ch chan int, update_distance_ch chan NodeData, done_ch chan bool) {
 	// Maps each node to its distance from the starting node
 	distances := make(map[string]int)
-	distances[starting_node.Name] = 0
+
+	for _, node := range starting_nodes {
+		distances[node.Name] = 0
+	}
 
 	for {
 		select {

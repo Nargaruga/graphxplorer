@@ -13,7 +13,7 @@ import (
 )
 
 // Function implementing a graph exploration strategy
-type explorationStrategy func(gographviz.Graph, gographviz.Node, chan NodeData, chan bool) error
+type explorationStrategy func(gographviz.Graph, []gographviz.Node, chan NodeData, chan bool) error
 
 func main() {
 	verbosePtr := flag.Bool("verbose", false, "print more information about the search")
@@ -22,13 +22,17 @@ func main() {
 
 	verbose := *verbosePtr
 
-	if len(flag.Args()) != 2 {
-		fmt.Println("Usage: ./graphxplorer [-verbose] <path> <starting_node>")
+	if len(flag.Args()) < 2 {
+		fmt.Println("Usage: ./graphxplorer [-verbose] <path> <starting_node_1> ... <starting_node_n>")
 		os.Exit(1)
 	}
 
 	path := flag.Args()[0]
-	starting_node_name := "\"" + flag.Args()[1] + "\"" // All node names are assumed to be quoted in the .gv files
+	starting_node_names := flag.Args()[1:]
+	for i := 0; i < len(starting_node_names); i++ {
+		// All node names are assumed to be quoted in the .gv files
+		starting_node_names[i] = "\"" + starting_node_names[i] + "\""
+	}
 
 	graph, err := deserializeGraph(path)
 	if err != nil {
@@ -39,18 +43,22 @@ func main() {
 		log.Fatal("No graph found.")
 	}
 
-	starting_node, ok := graph.Nodes.Lookup[starting_node_name]
-	if starting_node == nil || !ok {
-		log.Fatal("Invalid starting node: ", starting_node_name)
+	var starting_nodes []gographviz.Node
+	for _, starting_node_name := range starting_node_names {
+		starting_node, ok := graph.Nodes.Lookup[starting_node_name]
+		if starting_node == nil || !ok {
+			log.Fatal("Invalid starting node: ", starting_node_name)
+		}
+		starting_nodes = append(starting_nodes, *starting_node)
 	}
 
 	fmt.Println("--- Sequential ---")
-	explore_graph(*graph, BFS, *starting_node, verbose)
+	explore_graph(*graph, BFS, starting_nodes, verbose)
 
 	fmt.Println()
 
 	fmt.Println("--- Parallel ---")
-	explore_graph(*graph, ParallelBFS, *starting_node, verbose)
+	explore_graph(*graph, ParallelBFS, starting_nodes, verbose)
 }
 
 // Parse the contents of the provided file into a DOT graph and return it
@@ -78,7 +86,7 @@ func deserializeGraph(path string) (*gographviz.Graph, error) {
 }
 
 // Explore the graph with the requested strategy
-func explore_graph(graph gographviz.Graph, strategy explorationStrategy, starting_node gographviz.Node, verbose bool) {
+func explore_graph(graph gographviz.Graph, strategy explorationStrategy, starting_nodes []gographviz.Node, verbose bool) {
 	// Channel for communicating data about the explored nodes
 	node_data_ch := make(chan NodeData)
 	// Channel for communicating the end of the exploration
@@ -90,7 +98,7 @@ func explore_graph(graph gographviz.Graph, strategy explorationStrategy, startin
 	// Start the exploration in a new goroutine
 	go func() {
 		defer wg.Done()
-		strategy(graph, starting_node, node_data_ch, done_ch)
+		strategy(graph, starting_nodes, node_data_ch, done_ch)
 	}()
 	// Start the monitoring function in a new goroutine
 	go func() {
