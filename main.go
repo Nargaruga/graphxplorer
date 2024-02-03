@@ -16,25 +16,25 @@ import (
 type explorationStrategy func(gographviz.Graph, []gographviz.Node, chan NodeData, chan bool) error
 
 func main() {
+	// Parse flags and arguments
 	verbosePtr := flag.Bool("verbose", false, "print more information about the search")
-
 	flag.Parse()
-
 	verbose := *verbosePtr
 
+	// Check that we got at least the two required arguments
 	if len(flag.Args()) < 2 {
 		fmt.Println("Usage: ./graphxplorer [-verbose] <path> <starting_node_1> ... <starting_node_n>")
 		os.Exit(1)
 	}
 
-	path := flag.Args()[0]
+	// Path to the file to be parsed
+	file_path := flag.Args()[0]
+	// Names of the nodes in the starting frontier
 	starting_node_names := flag.Args()[1:]
-	for i := 0; i < len(starting_node_names); i++ {
-		// All node names are assumed to be quoted in the .gv files
-		starting_node_names[i] = "\"" + starting_node_names[i] + "\""
-	}
 
-	graph, err := deserializeGraph(path)
+	preprocessInput(starting_node_names)
+
+	graph, err := deserializeGraph(file_path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,13 +43,9 @@ func main() {
 		log.Fatal("No graph found.")
 	}
 
-	var starting_nodes []gographviz.Node
-	for _, starting_node_name := range starting_node_names {
-		starting_node, ok := graph.Nodes.Lookup[starting_node_name]
-		if starting_node == nil || !ok {
-			log.Fatal("Invalid starting node: ", starting_node_name)
-		}
-		starting_nodes = append(starting_nodes, *starting_node)
+	starting_nodes, err := buildInitialFrontier(*graph, starting_node_names)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	fmt.Println("--- Sequential ---")
@@ -59,6 +55,30 @@ func main() {
 
 	fmt.Println("--- Parallel ---")
 	explore_graph(*graph, ParallelBFS, starting_nodes, verbose)
+}
+
+// Preprocess the provided node names in-place before usage
+func preprocessInput(starting_node_names []string) {
+	// All node names are assumed to be quoted in the .gv files
+	// so we enclose each passed name in quotes
+	for i := 0; i < len(starting_node_names); i++ {
+		starting_node_names[i] = "\"" + starting_node_names[i] + "\""
+	}
+}
+
+// Builds the initial frontier from the requested nodes and returns it
+func buildInitialFrontier(graph gographviz.Graph, starting_node_names []string) ([]gographviz.Node, error) {
+	var starting_nodes []gographviz.Node
+
+	for _, starting_node_name := range starting_node_names {
+		starting_node, ok := graph.Nodes.Lookup[starting_node_name]
+		if starting_node == nil || !ok {
+			return nil, fmt.Errorf("invalid starting node: %s", starting_node_name)
+		}
+		starting_nodes = append(starting_nodes, *starting_node)
+	}
+
+	return starting_nodes, nil
 }
 
 // Parse the contents of the provided file into a DOT graph and return it
@@ -126,14 +146,8 @@ func gather_results(node_data_ch chan NodeData, done_ch chan bool, verbose bool)
 			if verbose {
 				fmt.Println("Nodes:")
 
-				// Sort nodes by their distance from the starting node
-				var sorted []NodeData
-				for name, dist := range node_distances {
-					sorted = append(sorted, NodeData{Name: name, Dist: dist})
-				}
-				sort.Slice(sorted, func(i, j int) bool {
-					return sorted[i].Dist < sorted[j].Dist
-				})
+				// List nodes by their distance from the starting frontier
+				sorted := listByDistance(node_distances)
 
 				for _, node := range sorted {
 					fmt.Println("\t- ", node.Name, "at distance", node.Dist)
@@ -143,4 +157,17 @@ func gather_results(node_data_ch chan NodeData, done_ch chan bool, verbose bool)
 			return
 		}
 	}
+}
+
+// List nodes based on their recorded distance, in ascending order
+func listByDistance(node_distances map[string]int) []NodeData {
+	var sorted []NodeData
+	for name, dist := range node_distances {
+		sorted = append(sorted, NodeData{Name: name, Dist: dist})
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Dist < sorted[j].Dist
+	})
+
+	return sorted
 }

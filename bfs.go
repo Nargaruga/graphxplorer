@@ -39,14 +39,13 @@ func BFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan N
 			continue
 		}
 
-		// Only update the distance if it is smaller than the currently recorded one
 		neighbours := getNeighbours(graph, node)
 		var neighbours_to_update []gographviz.Node
 		for _, neighbour := range neighbours {
 			old_dist, ok := distances[neighbour.Name]
 			new_dist := distances[node.Name] + 1
 
-			// We only update the distance if it's shorter than the one currently recorder
+			// We only update the distance if it's shorter than the currently recorded one
 			if !ok || new_dist < old_dist {
 				distances[neighbour.Name] = new_dist
 				neighbours_to_update = append(neighbours_to_update, neighbour)
@@ -120,7 +119,7 @@ func ParallelBFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_c
 					old_dist := <-get_distance_ch
 					new_dist := current_node_dist + 1
 
-					// We only update the distance if it's shorter than the one currently recorder
+					// We only update the distance if it's shorter than the currently recorded one
 					if new_dist < old_dist {
 						update_distance_ch <- NodeData{neighbour.Name, new_dist}
 						neighbours_to_update = append(neighbours_to_update, neighbour)
