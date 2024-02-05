@@ -143,9 +143,17 @@ func ParallelBFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_c
 // Return an array containing all the neighbours of the provided node
 func getNeighbours(graph gographviz.Graph, node gographviz.Node) []gographviz.Node {
 	var neighbours []gographviz.Node
-	// All nodes immediately reachable from this node
+
+	// All nodes reachable from this node in one step
 	for dst := range graph.Edges.SrcToDsts[node.Name] {
 		neighbours = append(neighbours, *graph.Nodes.Lookup[dst])
+	}
+
+	if !graph.Directed {
+		// All nodes from which this node can be reached in one step
+		for src := range graph.Edges.DstToSrcs[node.Name] {
+			neighbours = append(neighbours, *graph.Nodes.Lookup[src])
+		}
 	}
 
 	return neighbours
@@ -174,7 +182,7 @@ func maintainFrontier(starting_nodes []gographviz.Node, req_frontier_ch chan boo
 
 // Manage access to the recorded node distances, handling queries and updates
 func maintainDistances(starting_nodes []gographviz.Node, req_distance_ch chan string, get_distance_ch chan int, update_distance_ch chan NodeData, done_ch chan bool) {
-	// Maps each node to its distance from the starting node
+	// Maps each node to its distance from the starting nodes
 	distances := make(map[string]int)
 
 	for _, node := range starting_nodes {
@@ -184,7 +192,7 @@ func maintainDistances(starting_nodes []gographviz.Node, req_distance_ch chan st
 	for {
 		select {
 		case node_name := <-req_distance_ch:
-			// Send the requested node's distance
+			// Send the requested node distance
 			dist, ok := distances[node_name]
 			if !ok {
 				// This is the first time seeing the node, so we set its distance to the maximum

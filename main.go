@@ -137,7 +137,7 @@ func gather_results(node_data_ch chan NodeData, done_ch chan bool, verbose bool)
 	for {
 		select {
 		case node := <-node_data_ch:
-			// Update the distance for the newly received node
+			// Update the nodes's distance
 			node_distances[node.Name] = node.Dist
 		case <-done_ch:
 			// Print information about all the received nodes and return
