@@ -17,9 +17,7 @@ type NodeData struct {
 // 'out_ch' channel and communicating the end of the search through the
 // 'done_ch' channel
 func BFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan<- NodeData, done_ch chan bool) error {
-	// Keeps track of already-explored nodes
-	explored := make(map[string]bool)
-	// Maps each node to its distance from the starting node
+	// Maps each node to its distance from the starting nodes
 	distances := make(map[string]int)
 	// The current node frontier
 	var frontier []gographviz.Node
@@ -34,26 +32,17 @@ func BFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan<-
 		node := frontier[0]
 		frontier = frontier[1:]
 
-		// Skip already explored nodes
-		if explored[node.Name] {
-			continue
-		}
-
 		neighbours := getNeighbours(graph, node)
-		var neighbours_to_update []gographviz.Node
 		for _, neighbour := range neighbours {
-			old_dist, ok := distances[neighbour.Name]
-			new_dist := distances[node.Name] + 1
-
-			// We only update the distance if it's shorter than the currently recorded one
-			if !ok || new_dist < old_dist {
-				distances[neighbour.Name] = new_dist
-				neighbours_to_update = append(neighbours_to_update, neighbour)
+			_, already_visited := distances[neighbour.Name]
+			// If a neighbour hasn't yet been explored, we just found the
+			// shortest path to it.
+			if !already_visited {
+				distances[neighbour.Name] = distances[node.Name] + 1
+				frontier = append(frontier, neighbour)
 			}
 		}
-		frontier = append(frontier, neighbours_to_update...)
 
-		explored[node.Name] = true
 		out_ch <- NodeData{node.Name, distances[node.Name]}
 	}
 
