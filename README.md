@@ -27,25 +27,26 @@ go build
 
 The program can be started as 
 ```
-./graphxplorer [-verbose] <path> <starting_node_1> ... <starting_node_n>
+./graphxplorer [-verbose] [-n_workers n] <path> <starting_node_1> ... <starting_node_n>
 ```
 where
 - `path` is the path to a `.gv` file;
 - `<starting_node_1> ... <starting_node_n>` is the name of the nodes that make up the starting frontier.
 
 The `verbose` flag can be used to obtain more details about the search.
+The `n_workers` flag can be used to specify the number of parallel workers to use in the search.
 
 The `example_inputs` contains a couple of example files that can be used to test the program
 
 ## Details About the Parallelized Implementation
-The parallel implementation uses no mutexes, instead relying only on channels and goroutines. Each node of the frontier is processed in a new goroutine. Access to the map of node distances and to the frontier is regulated by two dedicated goroutines, which control access to the respective resource through message passing, as depicted in the [communication graph](#communication-graph).
+The parallel implementation uses no mutexes, instead relying only on channels and goroutines. The search is carried out by `n` worker coroutines, where `n` is provided by the user. Access to the map of node distances and to the frontier is regulated by two dedicated goroutines, which control access to the respective resource through message passing, as depicted in the [communication graph](#communication-graph).
 
 ### Spawn Hierarchy
 The hierarchy of spawned goroutines is organized as follows:
 
-![spawn_hierarchy](https://i.imgur.com/zZ0Xnaq.png)
+![spawn_hierarchy](https://i.imgur.com/dK6Q4EZ.png)
 
 ### Communication Graph
 The communication graph, where nodes are goroutines and edges represent channels, is structured as follows:
 
-![communication_graph](https://i.imgur.com/n3lXkrx.png)
+![communication_graph](https://i.imgur.com/1iQsCTf.png)
