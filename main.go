@@ -13,7 +13,7 @@ import (
 )
 
 // Function implementing a graph exploration strategy
-type explorationStrategy func(gographviz.Graph, []gographviz.Node, chan NodeData, chan bool) error
+type explorationStrategy func(gographviz.Graph, []gographviz.Node, chan<- NodeData, chan bool) error
 
 func main() {
 	// Parse flags and arguments
@@ -131,7 +131,7 @@ func explore_graph(graph gographviz.Graph, strategy explorationStrategy, startin
 }
 
 // Gather information about the nodes and print it once the exploration is over
-func gather_results(node_data_ch chan NodeData, done_ch chan bool, verbose bool) {
+func gather_results(node_data_ch <-chan NodeData, done_ch <-chan bool, verbose bool) {
 	node_distances := make(map[string]int)
 
 	for {

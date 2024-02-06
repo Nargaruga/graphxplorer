@@ -16,7 +16,7 @@ type NodeData struct {
 // Perform a BFS on the provided graph, sending data about every new node on the
 // 'out_ch' channel and communicating the end of the search through the
 // 'done_ch' channel
-func BFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan NodeData, done_ch chan bool) error {
+func BFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan<- NodeData, done_ch chan bool) error {
 	// Keeps track of already-explored nodes
 	explored := make(map[string]bool)
 	// Maps each node to its distance from the starting node
@@ -64,7 +64,7 @@ func BFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan N
 // Perform a BFS on the provided graph, sending data about every new node on the
 // 'out_ch' channel and communicating the end of the search through the
 // 'done_ch' channel
-func ParallelBFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan NodeData, done_ch chan bool) error {
+func ParallelBFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan<- NodeData, done_ch chan bool) error {
 	// Keeps track of already-explored nodes
 	explored := make(map[string]bool)
 
@@ -160,7 +160,7 @@ func getNeighbours(graph gographviz.Graph, node gographviz.Node) []gographviz.No
 }
 
 // Manage access to the frontier, appending received nodes and sending the current state of the frontier when requested
-func maintainFrontier(starting_nodes []gographviz.Node, req_frontier_ch chan bool, get_frontier_ch chan []gographviz.Node, append_ch chan []gographviz.Node, done_ch chan bool) {
+func maintainFrontier(starting_nodes []gographviz.Node, req_frontier_ch <-chan bool, get_frontier_ch chan<- []gographviz.Node, append_ch <-chan []gographviz.Node, done_ch <-chan bool) {
 	// The current node frontier
 	var frontier []gographviz.Node
 	frontier = append(frontier, starting_nodes...)
@@ -181,7 +181,7 @@ func maintainFrontier(starting_nodes []gographviz.Node, req_frontier_ch chan boo
 }
 
 // Manage access to the recorded node distances, handling queries and updates
-func maintainDistances(starting_nodes []gographviz.Node, req_distance_ch chan string, get_distance_ch chan int, update_distance_ch chan NodeData, done_ch chan bool) {
+func maintainDistances(starting_nodes []gographviz.Node, req_distance_ch <-chan string, get_distance_ch chan<- int, update_distance_ch <-chan NodeData, done_ch <-chan bool) {
 	// Maps each node to its distance from the starting nodes
 	distances := make(map[string]int)
 
