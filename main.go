@@ -12,14 +12,13 @@ import (
 	"github.com/awalterschulze/gographviz"
 )
 
-// Function implementing a graph exploration strategy
-type explorationStrategy func(gographviz.Graph, []gographviz.Node, chan<- NodeData, chan bool) error
-
 func main() {
 	// Parse flags and arguments
-	verbosePtr := flag.Bool("verbose", false, "print more information about the search")
+	verbose_ptr := flag.Bool("verbose", false, "print more information about the search")
+	n_workers_ptr := flag.Int("n_workers", 1, "number of parallel workers")
 	flag.Parse()
-	verbose := *verbosePtr
+	verbose := *verbose_ptr
+	n_workers := *n_workers_ptr
 
 	// Check that we got at least the two required arguments
 	if len(flag.Args()) < 2 {
@@ -31,8 +30,6 @@ func main() {
 	file_path := flag.Args()[0]
 	// Names of the nodes in the starting frontier
 	starting_node_names := flag.Args()[1:]
-
-	preprocessInput(starting_node_names)
 
 	graph, err := deserializeGraph(file_path)
 	if err != nil {
@@ -54,16 +51,7 @@ func main() {
 	fmt.Println()
 
 	fmt.Println("--- Parallel ---")
-	explore_graph(*graph, ParallelBFS, starting_nodes, verbose)
-}
-
-// Preprocess the provided node names in-place before usage
-func preprocessInput(starting_node_names []string) {
-	// All node names are assumed to be quoted in the .gv files
-	// so we enclose each passed name in quotes
-	for i := 0; i < len(starting_node_names); i++ {
-		starting_node_names[i] = "\"" + starting_node_names[i] + "\""
-	}
+	explore_graph(*graph, ParallelBFS(n_workers), starting_nodes, verbose)
 }
 
 // Builds the initial frontier from the requested nodes and returns it
@@ -106,7 +94,7 @@ func deserializeGraph(path string) (*gographviz.Graph, error) {
 }
 
 // Explore the graph with the requested strategy
-func explore_graph(graph gographviz.Graph, strategy explorationStrategy, starting_nodes []gographviz.Node, verbose bool) {
+func explore_graph(graph gographviz.Graph, strategy ExplorationStrategy, starting_nodes []gographviz.Node, verbose bool) {
 	// Channel for communicating data about the explored nodes
 	node_data_ch := make(chan NodeData)
 	// Channel for communicating the end of the exploration
