@@ -8,12 +8,14 @@ import (
 	"github.com/awalterschulze/gographviz"
 )
 
-// Holds the name of a node and its distance from the starting node
+// Holds the name of a node and its distance from the starting nodes
 type NodeData struct {
 	Name string
 	Dist int
 }
 
+// Holds the name of the node we are requesting information about and
+// the channel on which we will expect the response
 type distanceRequest struct {
 	Name        string
 	Response_ch chan int
@@ -24,7 +26,7 @@ type ExplorationStrategy func(gographviz.Graph, []gographviz.Node, chan<- NodeDa
 
 // Perform a BFS on the provided graph, sending data about every new node on the
 // 'out_ch' channel and communicating the end of the search through the
-// 'done_ch' channel
+// 'done_ch' channel. The `starting_nodes` are used as the starting point for the exploration.
 func BFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan<- NodeData, done_ch chan bool) error {
 	// Maps each node to its distance from the starting nodes
 	distances := make(map[string]int)
@@ -61,7 +63,7 @@ func BFS(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan<-
 
 // Perform a parallelized BFS on the provided graph with n worker goroutines, sending data about every new node on the
 // 'out_ch' channel and communicating the end of the search through the 'done_ch' channel
-func ParallelBFS(n_workers int) func(gographviz.Graph, []gographviz.Node, chan<- NodeData, chan bool) error {
+func ParallelBFS(n_workers int) ExplorationStrategy {
 	return func(graph gographviz.Graph, starting_nodes []gographviz.Node, out_ch chan<- NodeData, done_ch chan bool) error {
 		// Channel to receive the current frontier
 		frontier_ch := make(chan []gographviz.Node)
@@ -80,12 +82,14 @@ func ParallelBFS(n_workers int) func(gographviz.Graph, []gographviz.Node, chan<-
 		go maintainFrontier(starting_nodes, frontier_ch, frontier_append_ch, done_ch)
 		go maintainDistances(starting_nodes, distance_req_ch, distance_update_ch, done_ch)
 
+		// Barriers
 		var iteration_wg sync.WaitGroup
 		var search_wg sync.WaitGroup
 		search_wg.Add(n_workers)
 
+		// Spawn `n_workers` explorer goroutines
 		for i := 0; i < n_workers; i++ {
-			// Each goroutine uses a private channel to receive node distances
+			// Each explorer goroutine uses a private channel to receive node distances
 			distance_ch := make(chan int)
 
 			go func(id int, distance_ch chan int) {
@@ -189,6 +193,7 @@ func maintainFrontier(starting_nodes []gographviz.Node, frontier_ch chan<- []gog
 	for {
 		select {
 		case frontier_ch <- frontier:
+			// Send the current frontier
 			frontier = nil
 		case nodes := <-frontier_append_ch:
 			// Append the received nodes to the frontier

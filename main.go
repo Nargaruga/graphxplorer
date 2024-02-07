@@ -20,6 +20,11 @@ func main() {
 	verbose := *verbose_ptr
 	n_workers := *n_workers_ptr
 
+	if n_workers < 1 {
+		fmt.Println("The number of parallel workers cannot be lower than 1.")
+		os.Exit(1)
+	}
+
 	// Check that we got at least the two required arguments
 	if len(flag.Args()) < 2 {
 		fmt.Println("Usage: ./graphxplorer [-verbose] <path> <starting_node_1> ... <starting_node_n>")
@@ -46,12 +51,12 @@ func main() {
 	}
 
 	fmt.Println("--- Sequential ---")
-	explore_graph(*graph, BFS, starting_nodes, verbose)
+	exploreGraph(*graph, BFS, starting_nodes, verbose)
 
 	fmt.Println()
 
 	fmt.Println("--- Parallel ---")
-	explore_graph(*graph, ParallelBFS(n_workers), starting_nodes, verbose)
+	exploreGraph(*graph, ParallelBFS(n_workers), starting_nodes, verbose)
 }
 
 // Builds the initial frontier from the requested nodes and returns it
@@ -78,14 +83,14 @@ func deserializeGraph(path string) (*gographviz.Graph, error) {
 	}
 
 	// Parse the file contents into an AST
-	graphAst, err := gographviz.Parse(contents)
+	graph_ast, err := gographviz.Parse(contents)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create a graph from the AST
 	graph := gographviz.NewGraph()
-	err = gographviz.Analyse(graphAst, graph)
+	err = gographviz.Analyse(graph_ast, graph)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +99,7 @@ func deserializeGraph(path string) (*gographviz.Graph, error) {
 }
 
 // Explore the graph with the requested strategy
-func explore_graph(graph gographviz.Graph, strategy ExplorationStrategy, starting_nodes []gographviz.Node, verbose bool) {
+func exploreGraph(graph gographviz.Graph, strategy ExplorationStrategy, starting_nodes []gographviz.Node, verbose bool) {
 	// Channel for communicating data about the explored nodes
 	node_data_ch := make(chan NodeData)
 	// Channel for communicating the end of the exploration
@@ -111,7 +116,7 @@ func explore_graph(graph gographviz.Graph, strategy ExplorationStrategy, startin
 	// Start the monitoring function in a new goroutine
 	go func() {
 		defer wg.Done()
-		gather_results(node_data_ch, done_ch, verbose)
+		gatherResults(node_data_ch, done_ch, verbose)
 	}()
 	wg.Wait()
 	end := time.Now()
@@ -119,7 +124,8 @@ func explore_graph(graph gographviz.Graph, strategy ExplorationStrategy, startin
 }
 
 // Gather information about the nodes and print it once the exploration is over
-func gather_results(node_data_ch <-chan NodeData, done_ch <-chan bool, verbose bool) {
+func gatherResults(node_data_ch <-chan NodeData, done_ch <-chan bool, verbose bool) {
+	// Maps each node to its distance from the starting nodes
 	node_distances := make(map[string]int)
 
 	for {
@@ -150,9 +156,11 @@ func gather_results(node_data_ch <-chan NodeData, done_ch <-chan bool, verbose b
 // List nodes based on their recorded distance, in ascending order
 func listByDistance(node_distances map[string]int) []NodeData {
 	var sorted []NodeData
+
 	for name, dist := range node_distances {
 		sorted = append(sorted, NodeData{Name: name, Dist: dist})
 	}
+
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i].Dist < sorted[j].Dist
 	})
