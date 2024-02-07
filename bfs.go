@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"math"
 	"sync"
 
@@ -132,7 +132,7 @@ func ParallelBFS(n_workers int) ExplorationStrategy {
 					iteration_wg.Done()
 				}
 
-				fmt.Println("Worker", id, "processed", processed_nodes, "nodes.")
+				log.Println("Worker", id, "processed", processed_nodes, "nodes.")
 				search_wg.Done()
 			}(i, distance_ch)
 		}

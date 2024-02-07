@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -21,13 +22,13 @@ func main() {
 	n_workers := *n_workers_ptr
 
 	if n_workers < 1 {
-		fmt.Println("The number of parallel workers cannot be lower than 1.")
+		log.Println("The number of parallel workers cannot be lower than 1.")
 		os.Exit(1)
 	}
 
 	// Check that we got at least the two required arguments
 	if len(flag.Args()) < 2 {
-		fmt.Println("Usage: ./graphxplorer [-verbose] <path> <starting_node_1> ... <starting_node_n>")
+		log.Println("Usage: ./graphxplorer [-verbose] <path> <starting_node_1> ... <starting_node_n>")
 		os.Exit(1)
 	}
 
@@ -50,13 +51,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("--- Sequential ---")
-	exploreGraph(*graph, BFS, starting_nodes, verbose)
+	log.Println("--- Sequential ---")
+	results_seq := exploreGraph(*graph, BFS, starting_nodes, verbose)
 
 	fmt.Println()
 
-	fmt.Println("--- Parallel ---")
-	exploreGraph(*graph, ParallelBFS(n_workers), starting_nodes, verbose)
+	log.Println("--- Parallel ---")
+	results_par := exploreGraph(*graph, ParallelBFS(n_workers), starting_nodes, verbose)
+
+	// Make sure the two searches agree
+	if !reflect.DeepEqual(results_seq, results_par) {
+		log.Println("The two searches produced different results!")
+	}
 }
 
 // Builds the initial frontier from the requested nodes and returns it
@@ -99,11 +105,13 @@ func deserializeGraph(path string) (*gographviz.Graph, error) {
 }
 
 // Explore the graph with the requested strategy
-func exploreGraph(graph gographviz.Graph, strategy ExplorationStrategy, starting_nodes []gographviz.Node, verbose bool) {
+func exploreGraph(graph gographviz.Graph, strategy ExplorationStrategy, starting_nodes []gographviz.Node, verbose bool) []NodeData {
 	// Channel for communicating data about the explored nodes
 	node_data_ch := make(chan NodeData)
 	// Channel for communicating the end of the exploration
 	done_ch := make(chan bool)
+	// Final exploration results
+	var results []NodeData
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -116,15 +124,17 @@ func exploreGraph(graph gographviz.Graph, strategy ExplorationStrategy, starting
 	// Start the monitoring function in a new goroutine
 	go func() {
 		defer wg.Done()
-		gatherResults(node_data_ch, done_ch, verbose)
+		results = gatherResults(node_data_ch, done_ch, verbose)
 	}()
 	wg.Wait()
 	end := time.Now()
-	fmt.Println("Finished successfully in ", end.Sub(start).Microseconds(), "us.")
+	log.Println("Finished successfully in ", end.Sub(start).Microseconds(), "us.")
+
+	return results
 }
 
 // Gather information about the nodes and print it once the exploration is over
-func gatherResults(node_data_ch <-chan NodeData, done_ch <-chan bool, verbose bool) {
+func gatherResults(node_data_ch <-chan NodeData, done_ch <-chan bool, verbose bool) []NodeData {
 	// Maps each node to its distance from the starting nodes
 	node_distances := make(map[string]int)
 
@@ -135,20 +145,20 @@ func gatherResults(node_data_ch <-chan NodeData, done_ch <-chan bool, verbose bo
 			node_distances[node.Name] = node.Dist
 		case <-done_ch:
 			// Print information about all the received nodes and return
-			fmt.Println("Explored", len(node_distances), "nodes.")
+			log.Println("Explored", len(node_distances), "nodes.")
+
+			// List nodes by their distance from the starting frontier
+			sorted := listByDistance(node_distances)
 
 			if verbose {
-				fmt.Println("Nodes:")
-
-				// List nodes by their distance from the starting frontier
-				sorted := listByDistance(node_distances)
+				log.Println("Nodes:")
 
 				for _, node := range sorted {
-					fmt.Println("\t- ", node.Name, "at distance", node.Dist)
+					log.Println("\t- ", node.Name, "at distance", node.Dist)
 				}
 			}
 
-			return
+			return sorted
 		}
 	}
 }
@@ -162,7 +172,11 @@ func listByDistance(node_distances map[string]int) []NodeData {
 	}
 
 	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Dist < sorted[j].Dist
+		if sorted[i].Dist == sorted[j].Dist {
+			return sorted[i].Name < sorted[j].Name
+		} else {
+			return sorted[i].Dist < sorted[j].Dist
+		}
 	})
 
 	return sorted
